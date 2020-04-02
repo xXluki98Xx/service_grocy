@@ -1,0 +1,92 @@
+---
+- name: "service {{ container_name }}"
+  hosts: "all"
+
+  vars:
+
+    image_name: "docker.io/linuxserver/grocy"
+    image_update: false
+    container_name: "grocy"
+    container_port: "6060"
+
+  handlers:
+
+    - name: "Restart {{ container_name }} Service"
+      systemd:
+        name: "container_{{ container_name }}.service"
+        state: "restarted"
+      become: true
+      tags:
+        - "grocy"
+        - "container"
+        - "image"
+        - "service"
+
+  tasks:
+
+    - name: "Creating {{ container_name }} Service Folders"
+      file:
+        path: "/var/lib/hodgins/{{ container_name }}/{{ item }}"
+        state: directory
+        mode: 0755
+        group: "root"
+        owner: "101"
+        recurse: true
+      become: true
+      loop:
+        - ""
+        - "data"
+      tags:
+        - "grocy"
+        - "container"
+        - "service"
+
+    - name: "Manage {{ container_name }} Service Image"
+      podman_image:
+        name: "{{ image_name }}"
+        force: "{{ image_update | default(false) }}"
+      become: true
+      notify:
+        - "Restart {{ container_name }} Service"
+      tags:
+        - "grocy"
+        - "image"
+
+    - name: "Manage {{ container_name }} Service Configuration"
+      template:
+        src: "container_{{ container_name }}.service.j2"
+        dest: "/etc/systemd/system/container_{{ container_name }}.service"
+        owner: "root"
+        group: "root"
+        mode: 0644
+      become: true
+      notify:
+        - "Restart {{ container_name }} Service"
+      tags:
+        - "grocy"
+        - "container"
+        - "service"
+
+    - name: "Manage {{ container_name }} Service"
+      systemd:
+        name: "container_{{ container_name }}.service"
+        state: "started"
+        enabled: true
+        daemon_reload: true
+      become: true
+      tags:
+        - "grocy"
+        - "container"
+        - "service"
+
+    - name: "Manage {{ container_name }} Firewall Service"
+      firewalld:
+        port: "{{ container_port }}/tcp"
+        state: "enabled"
+        zone: "public"
+        immediate: true
+        permanent: true
+      become: true
+      tags:
+        - "grocy"
+        - "firewall"
